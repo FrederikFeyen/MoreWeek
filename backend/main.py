@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel # Added for login
+import sqlite3 # Added for login
 import httpx
 import os
 import hashlib
@@ -8,6 +10,8 @@ import time
 from gtts import gTTS
 from deep_translator import GoogleTranslator
 from typing import Optional, List
+import secrets
+
 
 app = FastAPI(title="Weather API")
 
@@ -19,6 +23,50 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==========================================
+# ADDED FOR LOGIN: Database & Hashing Setup
+# ==========================================
+DB_FILE = "users.db"
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, password_hash TEXT)''')
+    
+    cursor.execute("SELECT COUNT(*) FROM users")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO users (email, password_hash) VALUES (?, ?)", 
+                       ("farmer@tanzania.com", hash_password("weather123")))
+        conn.commit()
+    conn.close()
+
+init_db()
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/login")
+def login(req: LoginRequest):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT password_hash FROM users WHERE email = ?", (req.email,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row is None or row[0] != hash_password(req.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # NEW: Generate a secure 64-character session token
+    session_token = secrets.token_hex(32)
+    return {"message": "Login successful", "token": session_token}
+# ==========================================
+# END ADDED FOR LOGIN
+# ==========================================
 
 # Create static directory if it doesn't exist
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -65,21 +113,28 @@ def generate_warning(daily_data: dict):
 
 @app.get("/api/weather")
 async def get_weather(lat: float, lon: float):
-    # Updated URL to include precipitation_sum
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum&timezone=auto"
-    
+    # Ik heb alle originele parameters behouden (current_weather, daily temp, weathercode, precip)
+    # en enkel 'hourly=soil_moisture_0_to_10cm' toegevoegd aan het einde.
+    url = f"https://api.open-meteo.com/v1/forecast?latitude=%7Blat%7D&longitude=%7Blon%7D&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum&hourly=soil_moisture_0_to_10cm&timezone=auto%22"
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(url)
             response.raise_for_status()
             data = response.json()
-            
-            # Analyze forecast for warnings
+            # --- NIEUW: Bereken de bodemvochtigheid voor de bot ---
+            # We kijken in de 'hourly' data die we nu extra ophalen
+            if "hourly" in data and "soil_moisture_0_to_10cm" in data["hourly"]:
+                # Pak de eerste 24 uur van de voorspelling
+                moisture_values = data["hourly"]["soil_moisture_0_to_10cm"][:24]
+                data["current_moisture"] = round(sum(moisture_values) / 24, 3)
+            else:
+                data["current_moisture"] = "N/A"
+ 
+            # --- BEHOUDEN: Originele waarschuwing logica voor je dashboard ---
             if "daily" in data:
                 data["warning"] = generate_warning(data["daily"])
             else:
                 data["warning"] = {"text": "No forecast data available", "severity": "none"}
-                
             return data
         except httpx.HTTPError as e:
             raise HTTPException(status_code=500, detail=f"Failed to fetch weather data: {str(e)}")
