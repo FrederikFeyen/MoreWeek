@@ -13,11 +13,15 @@ from typing import Optional, List
 import secrets
  
 app = FastAPI(title="Weather API")
+
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
  
 # Configure CORS
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -152,7 +156,7 @@ async def list_tts_files():
             filepath = os.path.join(TTS_DIR, f)
             files.append({
                 "name": f.replace(".mp3", "").replace("_", " "),
-                "url": f"http://localhost:8000/static/tts/{f}",
+                "url": f"{BASE_URL}/static/tts/{f}",
                 "created_at": os.path.getctime(filepath)
             })
     # Sort by created_at descending
@@ -197,7 +201,7 @@ async def generate_tts(data: dict = Body(...)):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
     
-    return {"url": f"http://localhost:8000/static/tts/{filename}", "text": final_text, "lang": lang}
+    return {"url": f"{BASE_URL}/static/tts/{filename}", "text": final_text, "lang": lang}
  
 if __name__ == "__main__":
     import uvicorn
