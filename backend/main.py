@@ -15,7 +15,8 @@ app.add_middleware(
 )
 
 @app.get("/api/weather")
-async def get_weather(lat: float, lon: float):
+async def get_weather(lat: float = -6.7924,
+    lon: float = 39.2083):
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto"
     
     async with httpx.AsyncClient() as client:
