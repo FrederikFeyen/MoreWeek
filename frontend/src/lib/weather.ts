@@ -15,7 +15,7 @@ export interface WeatherData {
 }
 
 export async function fetchWeather(lat: number, lon: number): Promise<WeatherData> {
-  const response = await fetch(`http://127.0.0.1:8000/api/weather?lat=${lat}&lon=${lon}`);
+  const response = await fetch(`https://fastapi-backend-976721550665.europe-west1.run.app/api/weather?lat=${lat}&lon=${lon}`);
   if (!response.ok) {
     throw new Error('Failed to fetch weather data');
   }
