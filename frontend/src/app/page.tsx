@@ -253,13 +253,21 @@ const handleLogout = () => {
               <h2>{location.name}, {location.country}</h2>
               <p style={{ color: 'var(--text-muted)' }}>Current Conditions</p>
             </div>
-            <button 
-              className="speak-btn"
-              onClick={() => handleSpeak(currentDesc, 'current', 'Current_Weather')}
-              disabled={speaking === 'current'}
-            >
-              {speaking === 'current' ? '...' : `🔊 Speak (${selectedLang.toUpperCase()})`}
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button 
+                className="speak-btn"
+                onClick={() => handleSpeak(currentDesc, 'current', 'Current_Weather')}
+                disabled={speaking === 'current'}
+              >
+                {speaking === 'current' ? '...' : `🔊 Speak (${selectedLang.toUpperCase()})`}
+              </button>
+              <button 
+                className="sms-btn"
+                onClick={() => alert('message sent')}
+              >
+                📱 Send SMS
+              </button>
+            </div>
           </div>
           <div className="current-weather">
             <div className="temp">

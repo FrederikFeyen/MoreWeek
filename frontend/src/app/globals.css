@@ -433,6 +433,22 @@ body {
   cursor: not-allowed;
 }
 
+.sms-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: opacity 0.2s;
+  margin-left: 0.5rem;
+}
+
+.sms-btn:hover {
+  opacity: 0.8;
+}
+
 .speak-btn-small {
   background: #e4e6eb;
   color: var(--foreground);
