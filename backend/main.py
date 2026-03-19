@@ -11,27 +11,30 @@ from gtts import gTTS
 from deep_translator import GoogleTranslator
 from typing import Optional, List
 import secrets
-
-
+ 
 app = FastAPI(title="Weather API")
 
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+ 
 # Configure CORS
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+ 
 # ==========================================
 # ADDED FOR LOGIN: Database & Hashing Setup
 # ==========================================
 DB_FILE = "users.db"
-
+ 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
-
+ 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -39,17 +42,17 @@ def init_db():
     
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO users (email, password_hash) VALUES (?, ?)", 
+        cursor.execute("INSERT INTO users (email, password_hash) VALUES (?, ?)",
                        ("farmer@tanzania.com", hash_password("weather123")))
         conn.commit()
     conn.close()
-
+ 
 init_db()
-
+ 
 class LoginRequest(BaseModel):
     email: str
     password: str
-
+ 
 @app.post("/api/login")
 def login(req: LoginRequest):
     conn = sqlite3.connect(DB_FILE)
@@ -57,7 +60,7 @@ def login(req: LoginRequest):
     cursor.execute("SELECT password_hash FROM users WHERE email = ?", (req.email,))
     row = cursor.fetchone()
     conn.close()
-
+ 
     if row is None or row[0] != hash_password(req.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
@@ -67,15 +70,15 @@ def login(req: LoginRequest):
 # ==========================================
 # END ADDED FOR LOGIN
 # ==========================================
-
+ 
 # Create static directory if it doesn't exist
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 TTS_DIR = os.path.join(STATIC_DIR, "tts")
 os.makedirs(TTS_DIR, exist_ok=True)
-
+ 
 # Mount static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
+ 
 def generate_warning(daily_data: dict):
     """
     Analyzes 7-day forecast to generate a single warning label.
@@ -110,7 +113,7 @@ def generate_warning(daily_data: dict):
         return {"text": "Drought Conditions Possible", "severity": "medium"}
     
     return {"text": "Stable Weather Conditions", "severity": "none"}
-
+ 
 @app.get("/api/weather")
 async def get_weather(lat: float, lon: float):
     # Ik heb alle originele parameters behouden (current_weather, daily temp, weathercode, precip)
@@ -138,7 +141,7 @@ async def get_weather(lat: float, lon: float):
             return data
         except httpx.HTTPError as e:
             raise HTTPException(status_code=500, detail=f"Failed to fetch weather data: {str(e)}")
-
+ 
 @app.get("/api/search")
 async def search_location(name: str):
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={name}&count=20&language=en&format=json"
@@ -151,7 +154,7 @@ async def search_location(name: str):
             return data.get("results", [])
         except httpx.HTTPError as e:
             raise HTTPException(status_code=500, detail=f"Failed to fetch location data: {str(e)}")
-
+ 
 @app.get("/api/tts")
 async def list_tts_files():
     files = []
@@ -160,13 +163,13 @@ async def list_tts_files():
             filepath = os.path.join(TTS_DIR, f)
             files.append({
                 "name": f.replace(".mp3", "").replace("_", " "),
-                "url": f"http://localhost:8000/static/tts/{f}",
+                "url": f"{BASE_URL}/static/tts/{f}",
                 "created_at": os.path.getctime(filepath)
             })
     # Sort by created_at descending
     files.sort(key=lambda x: x["created_at"], reverse=True)
     return files
-
+ 
 @app.post("/api/tts")
 async def generate_tts(data: dict = Body(...)):
     text = data.get("text")
@@ -185,7 +188,7 @@ async def generate_tts(data: dict = Body(...)):
             print(f"Translation failed: {str(e)}")
             final_text = text # Fallback
             lang = "en" # Fallback lang if translation fails
-
+ 
     # Sanitize and use filename or fallback to hash
     if filename_input:
         # Include lang in filename to avoid conflicts
@@ -205,8 +208,8 @@ async def generate_tts(data: dict = Body(...)):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
     
-    return {"url": f"http://localhost:8000/static/tts/{filename}", "text": final_text, "lang": lang}
-
+    return {"url": f"{BASE_URL}/static/tts/{filename}", "text": final_text, "lang": lang}
+ 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)

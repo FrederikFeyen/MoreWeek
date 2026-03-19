@@ -34,11 +34,12 @@ interface WeatherChartProps {
 export default function WeatherChart({ data }: WeatherChartProps) {
   const labels = data.daily.time.map(t => new Date(t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }));
 
-  const chartData: ChartData<'line' | 'bar'> = {
+  // Only line datasets for Line chart
+  const lineChartData: ChartData<'line'> = {
     labels,
     datasets: [
       {
-        type: 'line' as const,
+        type: 'line',
         label: 'Max Temp (°C)',
         data: data.daily.temperature_2m_max,
         borderColor: '#ff4d4f',
@@ -48,7 +49,7 @@ export default function WeatherChart({ data }: WeatherChartProps) {
         fill: false,
       },
       {
-        type: 'line' as const,
+        type: 'line',
         label: 'Min Temp (°C)',
         data: data.daily.temperature_2m_min,
         borderColor: '#1890ff',
@@ -57,19 +58,10 @@ export default function WeatherChart({ data }: WeatherChartProps) {
         tension: 0.3,
         fill: false,
       },
-      {
-        type: 'bar' as const,
-        label: 'Rainfall (mm)',
-        data: data.daily.precipitation_sum,
-        backgroundColor: 'rgba(82, 196, 26, 0.4)',
-        borderColor: '#52c41a',
-        borderWidth: 1,
-        yAxisID: 'y-rain',
-      },
     ],
   };
 
-  const options: ChartOptions<'line' | 'bar'> = {
+  const options: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -116,7 +108,7 @@ export default function WeatherChart({ data }: WeatherChartProps) {
 
   return (
     <div className="chart-container">
-      <Line data={chartData} options={options as any} />
+      <Line data={lineChartData} options={options} />
     </div>
   );
 }
