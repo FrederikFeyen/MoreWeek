@@ -277,6 +277,8 @@ const handleLogout = () => {
               <p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
                 {getWeatherDescription(weather.current_weather.weathercode)}
               </p>
+              <p>Rain Probability: {weather.current_precipitation_probability}%</p>
+              <p>Soil Moisture: {weather.current_moisture} m³/m³</p>
               <p>Wind: {weather.current_weather.windspeed} km/h</p>
               <p>Time: {new Date(weather.current_weather.time).toLocaleTimeString()}</p>
             </div>

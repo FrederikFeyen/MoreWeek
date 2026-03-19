@@ -117,21 +117,27 @@ def generate_warning(daily_data: dict):
 @app.get("/api/weather")
 async def get_weather(lat: float, lon: float):
     # Ik heb alle originele parameters behouden (current_weather, daily temp, weathercode, precip)
-    # en enkel 'hourly=soil_moisture_0_to_10cm' toegevoegd aan het einde.
-    url = f"https://api.open-meteo.com/v1/forecast?latitude=%7Blat%7D&longitude=%7Blon%7D&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum&hourly=soil_moisture_0_to_10cm&timezone=auto%22"
+    # en 'hourly=soil_moisture_0_to_10cm,precipitation_probability' en 'daily=...precipitation_probability_max' toegevoegd.
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum,precipitation_probability_max&hourly=soil_moisture_0_to_10cm,precipitation_probability&timezone=auto"
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(url)
             response.raise_for_status()
             data = response.json()
+            
             # --- NIEUW: Bereken de bodemvochtigheid voor de bot ---
-            # We kijken in de 'hourly' data die we nu extra ophalen
             if "hourly" in data and "soil_moisture_0_to_10cm" in data["hourly"]:
                 # Pak de eerste 24 uur van de voorspelling
                 moisture_values = data["hourly"]["soil_moisture_0_to_10cm"][:24]
                 data["current_moisture"] = round(sum(moisture_values) / 24, 3)
             else:
                 data["current_moisture"] = "N/A"
+
+            # --- NIEUW: Haal de huidige neerslagkans op (eerste uur) ---
+            if "hourly" in data and "precipitation_probability" in data["hourly"]:
+                data["current_precipitation_probability"] = data["hourly"]["precipitation_probability"][0]
+            else:
+                data["current_precipitation_probability"] = 0
  
             # --- BEHOUDEN: Originele waarschuwing logica voor je dashboard ---
             if "daily" in data:

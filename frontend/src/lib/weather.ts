@@ -12,7 +12,10 @@ export interface WeatherData {
     temperature_2m_min: number[];
     weathercode: number[];
     precipitation_sum: number[];
+    precipitation_probability_max: number[];
   };
+  current_moisture?: number | string;
+  current_precipitation_probability?: number;
   warning?: {
     text: string;
     severity: 'none' | 'medium' | 'high';
@@ -31,7 +34,7 @@ export interface Location {
 }
 
 export async function fetchWeather(lat: number, lon: number): Promise<WeatherData> {
-  const response = await fetch(`https://fastapi-backend-976721550665.europe-west1.run.app/api/weather?lat=${lat}&lon=${lon}`);
+  const response = await fetch(`http://127.0.0.1:8000/api/weather?lat=${lat}&lon=${lon}`);
   if (!response.ok) {
     throw new Error('Failed to fetch weather data');
   }
