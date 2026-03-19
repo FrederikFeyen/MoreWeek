@@ -18,6 +18,49 @@ import {
 import WeatherChart from '../components/WeatherChart';
 
 export default function Dashboard() {
+  // ==========================================
+  // ADDED FOR LOGIN: State & Handlers
+  // ==========================================
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+// Check local storage for a valid token on initial load
+  useEffect(() => {
+    const savedToken = localStorage.getItem('poc_session_token');
+    // Basic validation: Check if it exists and looks like our 64-character hex token
+    if (savedToken && savedToken.length === 64) {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      const response = await fetch('http://localhost:8000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+
+      if (response.ok) {
+        const data = await response.json(); // NEW: Read the response data
+        setIsAuthenticated(true);
+        // NEW: Save the secure token instead of a boolean
+        localStorage.setItem('poc_session_token', data.token); 
+      } else {
+        setLoginError('Authentication Failed: Invalid email or password.');
+      }
+    } catch (error) {
+      setLoginError('Error connecting to the server. Is the backend running?');
+    }
+  };
+  // ==========================================
+  // END ADDED FOR LOGIN
+  // ==========================================
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'saved'>('dashboard');
   
   // Dashboard state
@@ -38,17 +81,20 @@ export default function Dashboard() {
   const [savedItems, setSavedItems] = useState<CachedItem[]>([]);
   const [voiceMessages, setVoiceMessages] = useState<VoiceMessage[]>([]);
 
-  // Selected Location (Default: London)
+// Selected Location (Default: Dodoma, Tanzania)
   const [location, setLocation] = useState<Location>({
-    id: 2643743,
-    name: 'London',
-    latitude: 51.5074,
-    longitude: -0.1278,
-    country: 'United Kingdom'
+    id: 152284,
+    name: 'Dodoma',
+    latitude: -6.1630,
+    longitude: 35.7516,
+    country: 'Tanzania'
   });
 
   // Fetch weather and save to cache
   useEffect(() => {
+    // Only fetch if authenticated!
+    if (!isAuthenticated) return;
+
     const loadWeather = async () => {
       setLoading(true);
       setError(null);
@@ -63,11 +109,11 @@ export default function Dashboard() {
       }
     };
     loadWeather();
-  }, [location]);
+  }, [location, isAuthenticated]);
 
   // Load saved items and voice messages when tab switches
   useEffect(() => {
-    if (activeTab === 'saved') {
+    if (activeTab === 'saved' && isAuthenticated) {
       setSavedItems(getCachedItems());
       const loadVoiceMessages = async () => {
         try {
@@ -79,7 +125,7 @@ export default function Dashboard() {
       };
       loadVoiceMessages();
     }
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated]);
 
   // Handle outside click for search dropdown
   useEffect(() => {
@@ -91,6 +137,13 @@ export default function Dashboard() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('poc_session_token'); // NEW: Clear the token
+    setLoginEmail('');
+    setLoginPassword('');
+  };
 
   const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
@@ -147,6 +200,35 @@ export default function Dashboard() {
     removeFromCache(id);
     setSavedItems(getCachedItems());
   };
+
+  // ==========================================
+  // ADDED FOR LOGIN: Render Login Screen if not authenticated
+  // ==========================================
+  if (!isAuthenticated) {
+    return (
+      <main className="container" style={{ maxWidth: '400px', marginTop: '5rem', marginInline: 'auto' }}>
+        <div className="dashboard-card" style={{ padding: '2rem', border: '1px solid #eaeaea', borderRadius: '8px' }}>
+          <h2 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>Secure Portal Login</h2>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <input 
+              type="text" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} 
+              placeholder="farmer@tanzania.com" 
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', color: 'black' }} 
+            />
+            <input 
+              type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} 
+              placeholder="Password (weather123)" 
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', color: 'black' }} 
+            />
+            {loginError && <div style={{ color: 'red', fontSize: '0.9rem' }}>{loginError}</div>}
+            <button type="submit" style={{ padding: '0.75rem', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              Secure Login
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
 
   const renderDashboard = () => {
     if (loading && !weather) return <div className="loading-state">Loading weather...</div>;
@@ -358,6 +440,15 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* ADDED FOR LOGIN: Logout Button in Navbar */}
+        <button 
+          onClick={handleLogout} 
+          style={{ padding: '0.5rem 1rem', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginLeft: 'auto' }}
+        >
+          Logout
+        </button>
+
       </div>
       
       {loading && activeTab === 'dashboard' && <div className="loading-overlay">Updating...</div>}
