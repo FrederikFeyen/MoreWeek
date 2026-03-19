@@ -116,21 +116,28 @@ def generate_warning(daily_data: dict):
  
 @app.get("/api/weather")
 async def get_weather(lat: float, lon: float):
-    # Updated URL to include precipitation_sum
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum&timezone=auto"
-    
+    # Ik heb alle originele parameters behouden (current_weather, daily temp, weathercode, precip)
+    # en enkel 'hourly=soil_moisture_0_to_10cm' toegevoegd aan het einde.
+    url = f"https://api.open-meteo.com/v1/forecast?latitude=%7Blat%7D&longitude=%7Blon%7D&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum&hourly=soil_moisture_0_to_10cm&timezone=auto%22"
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(url)
             response.raise_for_status()
             data = response.json()
-            
-            # Analyze forecast for warnings
+            # --- NIEUW: Bereken de bodemvochtigheid voor de bot ---
+            # We kijken in de 'hourly' data die we nu extra ophalen
+            if "hourly" in data and "soil_moisture_0_to_10cm" in data["hourly"]:
+                # Pak de eerste 24 uur van de voorspelling
+                moisture_values = data["hourly"]["soil_moisture_0_to_10cm"][:24]
+                data["current_moisture"] = round(sum(moisture_values) / 24, 3)
+            else:
+                data["current_moisture"] = "N/A"
+ 
+            # --- BEHOUDEN: Originele waarschuwing logica voor je dashboard ---
             if "daily" in data:
                 data["warning"] = generate_warning(data["daily"])
             else:
                 data["warning"] = {"text": "No forecast data available", "severity": "none"}
-                
             return data
         except httpx.HTTPError as e:
             raise HTTPException(status_code=500, detail=f"Failed to fetch weather data: {str(e)}")
